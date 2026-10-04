@@ -3,3 +3,4 @@ matplotlib
 wfdb
 scikit-learn
 scipy
+torch
