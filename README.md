@@ -225,3 +225,35 @@ These scripts are for inspection/testing and are not required by model training 
 - Each heartbeat has 180 samples.
 - Do not create a separate Train / Validation / Test split inside individual model files.
 - Use the shared files in `processed_data/split/` through `data_loader.py` or `dataset.py`.
+
+
+## 9. ECG Studio web
+
+The web interface is in [`web/`](web/README.md). It can run independently in browser demo mode; an optional FastAPI backend connects the interface to trained models later.
+
+From the repository root:
+
+```bash
+npm --prefix web ci
+npm --prefix web run dev
+```
+
+Open `http://127.0.0.1:5173`. To run the optional backend:
+
+```bash
+python -m pip install -r web/backend/requirements.txt
+python -m uvicorn app:app --app-dir web/backend --host 127.0.0.1 --port 8000
+```
+
+The group contract is **180 raw samples at 360 Hz** with class order **N, S, V, F, Q**. A configured trained checkpoint uses the existing `preprocessing.py` bandpass + Z-score pipeline without resampling. Browser/prototype demos use a separate illustrative 256-sample pipeline and do not report MIT-BIH accuracy.
+
+`data_loader.py` currently reads the raw split. Models using the `team` API adapter must train with `processed_data/preprocessed/` or call the same shared `preprocess_data` function. Do not filter preprocessed signals again when sending them to the API.
+
+- [Run the web and API](web/README.md)
+- [Integrate and check trained checkpoints](web/docs/MODEL_INTEGRATION.md)
+- Export one raw heartbeat: `python web/scripts/export_heartbeat.py --split test --index 0 --output exports/test-beat-0.csv`
+- The `ECG web checks` workflow tests the frontend, backend/shared pipeline and exporter, and builds the web on working branches and pull requests. It does not publish a website or merge branches.
+
+The generated static interface can be hosted separately when the team chooses to publish it. A trained model needs a separate HTTPS API; the web can be pointed to it through **Kết nối model**. No trained checkpoint or generated dataset is included in this web addition.
+
+Keep web work on a separate branch such as `feature/ecg-web`; push that branch and review it with the team before merging. This addition does not deploy automatically.

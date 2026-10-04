@@ -18,3 +18,20 @@ Thumbs.db
 # Generated / local dataset files
 data/
 processed_data/
+# Web build and local integration files
+web/node_modules/
+web/dist/
+web/.env*
+!web/.env.example
+.env
+.env.local
+.env.*.local
+checkpoints/
+web/backend/.env*
+!web/backend/.env.example
+*.pt
+*.pth
+*.onnx
+*.npy
+.local/
+exports/
