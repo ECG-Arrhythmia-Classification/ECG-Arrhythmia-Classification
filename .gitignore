@@ -9,9 +9,12 @@ venv/
 # macOS
 .DS_Store
 
+# Windows
+Thumbs.db
+
+# VS Code
+.vscode/
+
 # Generated / local dataset files
 data/
 processed_data/
-
-#VSCode
-.vscode/
