@@ -1,227 +1,107 @@
-# ECG Arrhythmia Classification with Deep Sequence Models
+# ECG Arrhythmia Classification
 
-This project prepares the MIT-BIH Arrhythmia Database for ECG heartbeat classification using five classes. The data pipeline produces one common Train / Validation / Test dataset that can be used by CNN, RNN/LSTM/GRU, Transformer, and evaluation components.
+This project uses the MIT-BIH Arrhythmia Database to classify ECG heartbeats into five classes. The shared dataset is split into train, validation, and test sets by record, so heartbeats from the same record do not appear in different splits.
 
-## 1. Dataset
+## Dataset
 
-Dataset: **MIT-BIH Arrhythmia Database**
+Each heartbeat is represented by 180 samples: 90 before and 90 after its annotated position.
 
-The current preprocessing maps ECG annotation symbols into five classes:
-
-| Label | Class | Meaning |
+| Label | Class | Description |
 |---:|:---:|---|
 | 0 | N | Normal |
 | 1 | S | Supraventricular ectopic |
 | 2 | V | Ventricular ectopic |
 | 3 | F | Fusion |
-| 4 | Q | Unknown / paced / other |
+| 4 | Q | Paced, unknown, or other |
 
-Each heartbeat is extracted as a fixed-length segment of **180 samples**: 90 samples before the annotated heartbeat position and 90 samples after it.
+The processed dataset has 109,468 heartbeats:
 
-## 2. Dataset statistics
-
-The complete processed dataset contains **109,468 heartbeat samples**.
-
-Current split:
-
-| Split | Number of samples | Shape of X | Shape of y |
+| Split | Samples | Shape of X | Shape of y |
 |---|---:|---|---|
-| Train | 74,810 | (74810, 180) | (74810,) |
-| Validation | 16,560 | (16560, 180) | (16560,) |
-| Test | 18,098 | (18098, 180) | (18098,) |
+| Train | 74,810 | `(74810, 180)` | `(74810,)` |
+| Validation | 16,560 | `(16560, 180)` | `(16560,)` |
+| Test | 18,098 | `(18098, 180)` | `(18098,)` |
 
-The split is performed by **record ID**, so a record is assigned to only one of Train / Validation / Test.
+## Get the ready-to-use dataset
 
-Current class distribution:
+The files in `processed_data/split/` are stored with [Git LFS](https://git-lfs.com/).
 
-### Train
+1. Install Git and Git LFS. Follow the [Git LFS installation guide](https://git-lfs.com/) for your operating system.
+2. Clone the repository and download the data:
 
-| Class | Count | Percentage |
-|:---:|---:|---:|
-| N | 63,692 | 85.14% |
-| S | 1,943 | 2.60% |
-| V | 4,614 | 6.17% |
-| F | 388 | 0.52% |
-| Q | 4,173 | 5.58% |
+   ```bash
+   git lfs install
+   git clone https://github.com/ECG-Arrhythmia-Classification/ECG-Arrhythmia-Classification.git
+   cd ECG-Arrhythmia-Classification
+   git lfs pull
+   ```
 
-### Validation
+3. Create a Python environment and install the dependencies:
 
-| Class | Count | Percentage |
-|:---:|---:|---:|
-| N | 13,046 | 78.78% |
-| S | 338 | 2.04% |
-| V | 1,006 | 6.07% |
-| F | 364 | 2.20% |
-| Q | 1,806 | 10.91% |
+   **macOS / Linux**
 
-### Test
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
 
-| Class | Count | Percentage |
-|:---:|---:|---:|
-| N | 13,870 | 76.64% |
-| S | 500 | 2.76% |
-| V | 1,615 | 8.92% |
-| F | 50 | 0.28% |
-| Q | 2,063 | 11.40% |
+   **Windows PowerShell**
 
-## 3. Project structure
+   ```powershell
+   py -m venv .venv
+   .venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   ```
 
-```text
-ECG-Arrhythmia-Classification/
-│
-├── data/
-│   └── MIT-BIH raw ECG files
-│
-├── processed_data/
-│   ├── X.npy
-│   ├── y.npy
-│   ├── record_ids.npy
-│   └── split/
-│       ├── X_train.npy
-│       ├── y_train.npy
-│       ├── X_val.npy
-│       ├── y_val.npy
-│       ├── X_test.npy
-│       └── y_test.npy
-│
-├── prepare_dataset.py
-├── split_dataset.py
-├── verify_dataset.py
-├── plot_ecg.py
-├── test_ecg.py
-├── data_loader.py
-├── dataset.py
-├── requirements.txt
-└── README.md
-```
+4. Check that the dataset files are present and valid:
 
-## 4. Data pipeline
+   ```bash
+   python verify_dataset.py
+   ```
+
+If Git LFS was not installed before cloning, install it and run `git lfs pull` from the repository folder.
+
+## Use the data
+
+The ready-to-use files are:
 
 ```text
-MIT-BIH raw records
-        ↓
-prepare_dataset.py
-        ↓
-X.npy / y.npy / record_ids.npy
-        ↓
-split_dataset.py
-        ↓
-Train / Validation / Test
-        ↓
-verify_dataset.py
-        ↓
-data_loader.py
-        ↓
-dataset.py
-        ↓
-CNN / RNN-LSTM-GRU / Transformer / Evaluation
+processed_data/split/
+├── X_train.npy
+├── y_train.npy
+├── X_val.npy
+├── y_val.npy
+├── X_test.npy
+└── y_test.npy
 ```
 
-## 5. How to run
-
-### Step 1: Activate the virtual environment
-
-```bash
-source venv/bin/activate
-```
-
-### Step 2: Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### Step 3: Prepare the processed heartbeat dataset
-
-```bash
-python prepare_dataset.py
-```
-
-This creates:
-
-```text
-processed_data/X.npy
-processed_data/y.npy
-processed_data/record_ids.npy
-```
-
-### Step 4: Split the dataset
-
-```bash
-python split_dataset.py
-```
-
-This creates:
-
-```text
-processed_data/split/X_train.npy
-processed_data/split/y_train.npy
-processed_data/split/X_val.npy
-processed_data/split/y_val.npy
-processed_data/split/X_test.npy
-processed_data/split/y_test.npy
-```
-
-### Step 5: Verify the processed dataset
-
-```bash
-python verify_dataset.py
-```
-
-The verification checks that the files can be loaded, the shapes are correct, all five labels are present, and there are no NaN or Inf values in the ECG data.
-
-### Step 6: Test the common data loader
-
-```bash
-python data_loader.py
-```
-
-### Step 7: Test the Dataset wrapper
-
-```bash
-python dataset.py
-```
-
-## 6. Using the data in model code
-
-Model members can load the common dataset through `data_loader.py`:
+Load all three splits in Python with:
 
 ```python
 from data_loader import load_dataset
 
-(
-    X_train, y_train,
-    X_val, y_val,
-    X_test, y_test
-) = load_dataset()
+X_train, y_train, X_val, y_val, X_test, y_test = load_dataset()
 ```
 
-The common data format is:
+Use these shared splits for all models so their results can be compared fairly. Do not create a different train/validation/test split for each model.
 
-```text
-X_train: (74810, 180)
-y_train: (74810,)
+## Rebuild the processed dataset
 
-X_val: (16560, 180)
-y_val: (16560,)
+Most team members do not need to run these steps. The ready-to-use split files are already available through Git LFS.
 
-X_test: (18098, 180)
-y_test: (18098,)
+To rebuild the dataset, first put the MIT-BIH raw record files (`.dat`, `.hea`, and `.atr`) in the `data/` folder. Raw files are not included in this repository. Then run:
+
+```bash
+python prepare_dataset.py
+python split_dataset.py
+python verify_dataset.py
 ```
 
-All models should use the same Train / Validation / Test files so that CNN, RNN/LSTM/GRU, Transformer, and evaluation results are comparable.
+This creates `processed_data/X.npy`, `processed_data/y.npy`, `processed_data/record_ids.npy`, and the split files in `processed_data/split/`.
 
-## 7. Utility scripts
+## Notes
 
-`plot_ecg.py` displays the ECG signal from a raw MIT-BIH record.
-
-`test_ecg.py` is used to inspect a raw ECG record and its basic properties.
-
-These scripts are for inspection/testing and are not required by model training code.
-
-## 8. Notes for the team
-
-- Label IDs must remain consistent: `0=N`, `1=S`, `2=V`, `3=F`, `4=Q`.
-- Each heartbeat has 180 samples.
-- Do not create a separate Train / Validation / Test split inside individual model files.
-- Use the shared files in `processed_data/split/` through `data_loader.py` or `dataset.py`.
+- Keep the label mapping unchanged: `0=N`, `1=S`, `2=V`, `3=F`, `4=Q`.
+- `plot_ecg.py` and `test_ecg.py` are utilities for inspecting raw ECG records.
+- `requirements.txt` lists the Python dependencies.
