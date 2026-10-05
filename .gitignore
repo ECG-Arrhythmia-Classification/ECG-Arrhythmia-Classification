@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.pyc
+.matplotlib_cache/
 
 # Virtual environments
 venv/
@@ -17,3 +18,5 @@ Thumbs.db
 
 # Generated / local dataset files
 data/
+processed_data/preprocessed/
+processed_data/augmented/
