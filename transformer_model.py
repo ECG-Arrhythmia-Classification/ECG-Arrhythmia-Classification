@@ -59,18 +59,14 @@ class ECGTransformer(nn.Module):
         self.classifier = nn.Linear(dimension, classes)
         nn.init.normal_(self.class_token, std=0.02)
 
-    @staticmethod
-    def _make_position_encoding(length, dimension):
-        position = torch.arange(length, dtype=torch.float32).unsqueeze(1)
-        scale = torch.exp(torch.arange(0, dimension, 2) * (-math.log(10000.0) / dimension))
-        encoding = torch.zeros(length, dimension)
-        encoding[:, 0::2] = torch.sin(position * scale)
-        encoding[:, 1::2] = torch.cos(position * scale[:encoding[:, 1::2].shape[1]])
-        return encoding.unsqueeze(0)
-
-    def forward(self, x, show_attention=False):
-        if x.ndim == 2:
-            x = x.unsqueeze(1)
+   @staticmethod
+def _make_position_encoding(length, dimension):
+    position = torch.arange(length, dtype=torch.float32).unsqueeze(1)
+    scale = torch.exp(torch.arange(0, dimension, 2) * (-math.log(10000.0) / dimension))
+    encoding = torch.zeros(length, dimension)
+    encoding[:, 0::2] = torch.sin(position * scale)
+    encoding[:, 1::2] = torch.cos(position * scale[:encoding[:, 1::2].shape[1]])
+    return encoding.unsqueeze(0)
         if x.ndim != 3 or x.shape[1:] != (1, self.input_length):
             raise ValueError(f"Expected input shape (batch, {self.input_length})")
 
