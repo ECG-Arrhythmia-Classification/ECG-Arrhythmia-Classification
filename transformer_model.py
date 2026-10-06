@@ -61,6 +61,7 @@ class ECGTransformer(nn.Module):
 
  feature/ecg-transformer
  feature/ecg-transformer
+ feature/ecg-transformer
 
   """Small Transformer classifier for 180-sample ECG heartbeats."""
 
@@ -174,3 +175,8 @@ def _make_position_encoding(length, dimension):
 
         logits = self.classifier(x[:, 0])
         return (logits, attention) if show_attention else logits
+
+    @staticmethod
+    def _make_position_encoding(length, dimension):*
+
+ main
