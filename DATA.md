@@ -8,6 +8,8 @@ We use the [MIT-BIH Arrhythmia Database, version 1.0.0](https://physionet.org/co
 
 The processed train, validation, and test files are stored with [Git LFS](https://git-lfs.com/). Install Git LFS, then run:
 
+- Dataset files: [processed_data/split on GitHub](https://github.com/ECG-Arrhythmia-Classification/ECG-Arrhythmia-Classification/tree/main/processed_data/split)
+
 ```bash
 git lfs install
 git clone https://github.com/ECG-Arrhythmia-Classification/ECG-Arrhythmia-Classification.git
@@ -23,7 +25,7 @@ python verify_dataset.py
 
 ## How the data was prepared
 
-[`prepare_dataset.py`](./prepare_dataset.py) reads all 48 records listed in the script and uses the first ECG channel. For each included annotation, it extracts a 180-sample heartbeat segment with 90 samples before the annotation and 90 samples after the annotation. Windows that run past the start or end of a record are skipped. The script does not filter, resample, or normalize the signal.
+[`prepare_dataset.py`](./prepare_dataset.py) reads all 48 records listed in the script and uses the first ECG channel. For each included annotation, it extracts 180 samples: 90 before the annotation, the annotation sample itself, and 89 after it. Windows that run past the start or end of a record are skipped. The script does not filter, resample, or normalize the signal.
 
 Annotations are grouped into five classes:
 
