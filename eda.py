@@ -3,14 +3,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-# CONFIGURATION
+# cấu hình chung 
 
 ROOT_DIR = Path(__file__).resolve().parent
-
+# input data
 SPLIT_DIR = ROOT_DIR / "processed_data" / "split"
+# preprocess data 
 PREPROCESSED_DIR = ROOT_DIR / "processed_data" / "preprocessed"
+# augmentation data
 AUGMENTED_DIR = ROOT_DIR / "processed_data" / "augmented"
-
+# output data
 OUTPUT_DIR = ROOT_DIR / "results" / "eda"
 
 CLASS_NAMES = {
@@ -21,11 +23,10 @@ CLASS_NAMES = {
     4: "Q",
 }
 
-# DATA LOADING
-
+# load data
+# Load data for necessary analysis
 def load_data():
-    """Load data needed for exploratory data analysis."""
-
+    
     raw_signals = np.load(
         SPLIT_DIR / "X_train.npy"
     )
@@ -49,14 +50,13 @@ def load_data():
         augmented_labels,
     )
 
-# CLASS DISTRIBUTION
+# class distribution
 
 def plot_class_distribution(
     original_labels,
     augmented_labels,
 ):
-    """Compare class distribution before and after augmentation."""
-
+# Compare class distribution before and after augmentation
     class_ids = list(CLASS_NAMES.keys())
     class_names = list(CLASS_NAMES.values())
 
@@ -116,14 +116,13 @@ def plot_class_distribution(
 
     plt.close()
 
-# ECG EXAMPLES
+# mẫu ECG
 
 def plot_class_examples(
     processed_signals,
     labels,
 ):
-    """Plot one preprocessed heartbeat from each ECG class."""
-
+ # Plot one preprocessed heartbeat from each ECG class.
     plt.figure(
         figsize=(10, 12)
     )
@@ -172,14 +171,14 @@ def plot_class_examples(
 
     plt.close()
 
-# BEFORE / AFTER PREPROCESSING
+# before/after preprocessing
 
 def plot_preprocessing_comparison(
     raw_signals,
     processed_signals,
     labels,
 ):
-    """Compare one heartbeat before and after preprocessing."""
+# Compare one heartbeat before and after preprocessing
 
     normal_indices = np.where(
         labels == 0
@@ -243,7 +242,7 @@ def plot_preprocessing_comparison(
     plt.close()
 
 
-# MAIN
+# main
 
 def main():
 

@@ -1,0 +1,26 @@
+{
+    "CNN": {
+        "model": "CNN",
+        "trainable_parameters": 259109,
+        "total_inference_time_sec": 0.7199507999998787,
+        "avg_inference_time_per_sample_ms": 0.03978068294838538,
+        "throughput_samples_per_sec": 25137.828862754304,
+        "checkpoint_size_mb": 3.0304698944091797
+    },
+    "RNN_LSTM": {
+        "model": "RNN_LSTM",
+        "trainable_parameters": 36293,
+        "total_inference_time_sec": 1.8143529000003582,
+        "avg_inference_time_per_sample_ms": 0.1002515692341893,
+        "throughput_samples_per_sec": 9974.906204849358,
+        "checkpoint_size_mb": 0.14510822296142578
+    },
+    "Transformer": {
+        "model": "Transformer",
+        "trainable_parameters": 25765,
+        "total_inference_time_sec": 0.33068490000005113,
+        "avg_inference_time_per_sample_ms": 0.01827190297270699,
+        "throughput_samples_per_sec": 54728.837028836824,
+        "checkpoint_size_mb": 0.11400318145751953
+    }
+}

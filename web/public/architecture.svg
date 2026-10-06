@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 840" role="img" aria-labelledby="title description">
+  <title id="title">ECG Studio integration architecture</title>
+  <desc id="description">Offline training and evaluation produce checkpoints and test results. React sends a raw heartbeat with 180 samples at 360 Hz to FastAPI. The API applies shared preprocessing and runs CNN, BiLSTM, or Transformer inference, then returns a prediction and softmax scores. Saved evaluation results are displayed separately.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#5e7b86"/></marker>
+    <style>
+      text{font-family:Arial,"Segoe UI",sans-serif;fill:#123b40}
+      .title{font-size:32px;font-weight:700}
+      .subtitle{font-size:18px;fill:#5b7377}
+      .label{font-size:14px;font-weight:700;letter-spacing:2px;fill:#476b70}
+      .heading{font-size:22px;font-weight:700}
+      .body{font-size:17px;fill:#4f6c72}
+      .small{font-size:15px;fill:#4f6c72}
+      .box{fill:#fff;stroke:#c4d7da;stroke-width:1.5}
+      .line{fill:none;stroke:#5e7b86;stroke-width:2;marker-end:url(#arrow)}
+      .dashed{stroke-dasharray:5 5}
+    </style>
+  </defs>
+  <rect width="1440" height="840" fill="#fbfdfc"/>
+  <text x="48" y="58" class="title">ECG Studio · System architecture</text>
+  <text x="48" y="90" class="subtitle">Shared checkpoints and preprocessing, integrated with React + FastAPI</text>
+
+  <rect x="32" y="124" width="1376" height="236" rx="16" fill="#eef4f3"/>
+  <text x="52" y="155" class="label">OFFLINE TRAINING &amp; EVALUATION</text>
+  <rect x="52" y="180" width="230" height="134" rx="12" class="box"/>
+  <text x="72" y="212" class="heading" style="font-size:19px">MIT-BIH / shared splits</text>
+  <text x="72" y="242" class="body">Train · Validation · Test</text>
+  <text x="72" y="269" class="body">180 samples / heartbeat</text>
+  <text x="72" y="294" class="small">N · S · V · F · Q</text>
+
+  <path d="M282 247H322" class="line"/>
+  <rect x="322" y="180" width="246" height="134" rx="12" class="box"/>
+  <text x="342" y="212" class="heading">Shared pipeline</text>
+  <text x="342" y="242" class="body">Band-pass 0.5–40 Hz</text>
+  <text x="342" y="269" class="body">Per-heartbeat Z-score</text>
+  <text x="342" y="294" class="small">Training-only augmentation</text>
+
+  <path d="M568 247H608" class="line"/>
+  <rect x="608" y="180" width="284" height="134" rx="12" class="box"/>
+  <text x="628" y="212" class="heading" style="font-size:18px">CNN · BiLSTM · Transformer</text>
+  <text x="628" y="242" class="body">Training / best checkpoint</text>
+  <text x="628" y="269" class="body">Shared test set: 18,098 beats</text>
+  <text x="628" y="294" class="small">Accuracy · F1 · confusion matrix</text>
+
+  <path d="M892 247H932" class="line"/>
+  <rect x="932" y="180" width="456" height="134" rx="12" fill="#e0efeb" stroke="#aacbc2" stroke-width="1.5"/>
+  <text x="952" y="212" class="heading">Repository artifacts</text>
+  <text x="952" y="242" class="body">3 native checkpoints · metrics · benchmark</text>
+  <text x="952" y="269" class="body">Robustness: clean / 30 / 20 / 10 dB</text>
+  <text x="952" y="294" class="small">CNN selected from saved evaluation results</text>
+
+  <rect x="32" y="392" width="1376" height="284" rx="16" fill="#f1f6f8"/>
+  <text x="52" y="423" class="label">WEB INFERENCE · ONE HEARTBEAT PER REQUEST</text>
+  <rect x="52" y="454" width="252" height="164" rx="12" class="box"/>
+  <text x="72" y="487" class="heading">React / ECG input</text>
+  <text x="72" y="519" class="body">Select a real test heartbeat</text>
+  <text x="72" y="547" class="body">Or upload raw CSV / JSON</text>
+  <text x="72" y="575" class="body">180 samples at 360 Hz</text>
+  <text x="72" y="601" class="small">Keep ground truth separate</text>
+
+  <path d="M304 536H344" class="line"/>
+  <rect x="344" y="454" width="260" height="164" rx="12" class="box"/>
+  <text x="364" y="487" class="heading">FastAPI / validation</text>
+  <text x="364" y="519" class="body">Validate shape / values</text>
+  <text x="364" y="547" class="body">Run preprocessing.py</text>
+  <text x="364" y="575" class="body">Band-pass → Z-score</text>
+  <text x="364" y="601" class="small">Same pipeline as evaluation</text>
+
+  <path d="M604 536H644" class="line"/>
+  <rect x="644" y="454" width="292" height="164" rx="12" class="box"/>
+  <text x="664" y="487" class="heading" style="font-size:21px">PyTorch / CPU inference</text>
+  <text x="664" y="519" class="body">Load native checkpoint</text>
+  <text x="664" y="547" class="body">eval() · inference_mode()</text>
+  <text x="664" y="575" class="body">Logits → 5-class softmax</text>
+  <text x="664" y="601" class="small">Default CNN / compare all three</text>
+
+  <path d="M936 536H976" class="line"/>
+  <rect x="976" y="454" width="412" height="164" rx="12" fill="#123b40"/>
+  <text x="996" y="487" class="heading" style="fill:#fff">React / results &amp; reports</text>
+  <text x="996" y="519" class="body" style="fill:#d5e7e7">Raw / processed ECG · prediction · scores</text>
+  <text x="996" y="547" class="body" style="fill:#d5e7e7">Model comparison · JSON export</text>
+  <text x="996" y="575" class="body" style="fill:#d5e7e7">Metrics / confusion matrix / robustness</text>
+  <text x="996" y="601" class="small" style="fill:#b2ced0">GET /evaluation serves saved results</text>
+
+  <path d="M1032 314V373H790V452" class="line dashed"/>
+  <text x="708" y="390" class="small">Checkpoint</text>
+  <path d="M1266 314V452" class="line dashed"/>
+  <text x="1280" y="382" class="small">Metrics</text>
+
+  <text x="52" y="652" class="small">/examples: raw test data → web    ·    /predict: raw signal → pipeline → checkpoint → result    ·    /evaluation: offline results</text>
+  <rect x="32" y="704" width="1376" height="104" rx="16" fill="#fff" stroke="#d6e2e4" stroke-width="1.5"/>
+  <text x="52" y="740" class="heading">Explicit result provenance</text>
+  <text x="52" y="769" class="body">Trained models are the default; prototypes require demo mode. Individual scores differ from test-set accuracy and F1.</text>
+  <text x="52" y="794" class="small">For academic use. Running a prediction does not retrain models or generate new benchmark results.</text>
+</svg>

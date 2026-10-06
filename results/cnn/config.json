@@ -1,0 +1,16 @@
+{
+  "epochs": 15,
+  "batch_size": 128,
+  "lr": 0.001,
+  "weight_decay": 0.0001,
+  "dropout": 0.3,
+  "patience": 6,
+  "seed": 42,
+  "data_source": "augmented",
+  "use_class_weights": false,
+  "output_dir": "results/cnn",
+  "best_epoch": 7,
+  "best_val_macro_f1": 0.5256926299550635,
+  "total_training_time_seconds": 118.99,
+  "device": "cuda"
+}

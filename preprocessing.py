@@ -1,12 +1,10 @@
 
-
 from pathlib import Path
 
 import numpy as np
 from scipy.signal import butter, sosfiltfilt
 
-
-# CONFIGURATION
+# khai báo cấu hình chung
 
 ROOT_DIR = Path(__file__).resolve().parent
 
@@ -25,10 +23,9 @@ FILTER_ORDER = 4
 MIN_STD = 1e-8
 
 
-# LOAD DATA
+# lóad data
 
 def load_data(split_name):
-    """Load ECG signals and labels from Member 1."""
 
     X_path = INPUT_DIR / f"X_{split_name}.npy"
     y_path = INPUT_DIR / f"y_{split_name}.npy"
@@ -48,10 +45,9 @@ def load_data(split_name):
 
     return X, y
 
-# CHECK DATA
+# check data
 def check_data(X, y):
-    """Check ECG data shape and values."""
-
+    
     if X.ndim != 2:
         raise ValueError(
             f"Expected X to be 2D, got {X.shape}"
@@ -65,19 +61,16 @@ def check_data(X, y):
 
     if len(X) != len(y):
         raise ValueError(
-            "Number of ECG signals and labels does not match."
         )
 
     if not np.isfinite(X).all():
         raise ValueError(
-            "ECG data contains NaN or Inf."
         )
 
 
-# FILTER SIGNAL
-
+# filter signal
+# Remove low-frequency and high-frequency noise
 def filter_signal(X):
-    """Remove low-frequency and high-frequency noise."""
 
     filter_sos = butter(
         FILTER_ORDER,
@@ -95,10 +88,9 @@ def filter_signal(X):
 
     return X_filtered.astype(np.float32)
 
-# NORMALIZE SIGNAL
+# normalize heartbeat
 
 def normalize_signal(X):
-    """Normalize each heartbeat using Z-score."""
 
     signal_mean = X.mean(
         axis=1,
@@ -120,10 +112,9 @@ def normalize_signal(X):
 
     return X_normalized.astype(np.float32)
 
-# PREPROCESS DATA
-
+# preprocess data
+# Apply filtering and normalization
 def preprocess_data(X):
-    """Apply filtering and normalization."""
 
     X_float = X.astype(np.float32)
 
@@ -137,10 +128,9 @@ def preprocess_data(X):
 
     return X_processed
 
-# PROCESS ONE SPLIT
+# process data
 
 def process_split(split_name):
-    """Process and save one dataset split."""
 
     print(f"\nProcessing {split_name}...")
 
@@ -178,7 +168,8 @@ def process_split(split_name):
         f"Output: {X_processed.shape}"
     )
 
-# MAIN
+# main
+# control the train, val, test process
 def main():
 
     print("=" * 50)

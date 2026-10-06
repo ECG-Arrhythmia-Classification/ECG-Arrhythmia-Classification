@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-# CONFIGURATION
+# Cấu hình chung 
 
 ROOT_DIR = Path(__file__).resolve().parent
 
@@ -22,21 +22,20 @@ CLASS_NAMES = {
 
 VALID_LABELS = set(CLASS_NAMES.keys())
 
-# Minority classes are increased up to this number of samples.
+# tối đa 8000 sample cho 1 class
 TARGET_SAMPLES_PER_CLASS = 8000
 
-# Prevent very small classes from being augmented too aggressively.
+# mỗi class k tăng quá 10 lần
 MAX_AUGMENT_MULTIPLIER = 10
 
-# Mild augmentation settings.
+# mức độ nhiễu, tăng giảm biên độ, tín hiệu dịch tối đa 
 NOISE_LEVEL_RANGE = (0.01, 0.03)
 AMPLITUDE_SCALE_RANGE = (0.90, 1.10)
-MAX_SHIFT_SAMPLES = 4
+MAX_SHIFT_SAMPLES = 4    
 
-# DATA LOADING
-
+# input data process
+# Load the preprocessed TRAIN dataset
 def load_training_data():
-    """Load the preprocessed training dataset."""
 
     feature_path = PREPROCESSED_DIR / "X_train.npy"
     label_path = PREPROCESSED_DIR / "y_train.npy"
@@ -64,10 +63,9 @@ def load_training_data():
     return ecg_signals, labels
 
 
-# DATA VALIDATION
-
+# data validation
+# Check if TRAIN data valid
 def validate_training_data(ecg_signals, labels):
-    """Check ECG shape, labels, and numeric values."""
 
     if ecg_signals.ndim != 2:
         raise ValueError(
@@ -98,10 +96,9 @@ def validate_training_data(ecg_signals, labels):
             f"Invalid labels found: {sorted(current_labels)}."
         )
 
-# AUGMENTATION METHODS
-
+# augmentation method
+# add small amount of *noise
 def add_gaussian_noise(ecg_signal, random_generator):
-    """Add a small amount of Gaussian noise."""
 
     noise_level = random_generator.uniform(
         *NOISE_LEVEL_RANGE
@@ -117,9 +114,8 @@ def add_gaussian_noise(ecg_signal, random_generator):
 
     return noisy_signal
 
-
+# increase, decrease amplitude
 def scale_amplitude(ecg_signal, random_generator):
-    """Slightly increase or decrease ECG amplitude."""
 
     scale_factor = random_generator.uniform(
         *AMPLITUDE_SCALE_RANGE
@@ -129,9 +125,8 @@ def scale_amplitude(ecg_signal, random_generator):
 
     return scaled_signal
 
-
+# Shift the ECG signal slightly left or right
 def shift_signal(ecg_signal, random_generator):
-    """Shift the ECG signal slightly left or right."""
 
     shift_amount = int(
         random_generator.integers(
@@ -159,12 +154,9 @@ def shift_signal(ecg_signal, random_generator):
 
     return shifted_signal
 
-
+# Apply mild transformations 
 def augment_signal(ecg_signal, random_generator):
-    """
-    Apply mild transformations while preserving
-    the main ECG heartbeat morphology.
-    """
+
 
     augmented_signal = ecg_signal.copy()
 
@@ -189,10 +181,10 @@ def augment_signal(ecg_signal, random_generator):
     )
 
 
-# CLASS DISTRIBUTION
+# class distribution
+# check, distribute data between classes
 
 def print_class_distribution(labels, title):
-    """Print sample count and percentage for each class."""
 
     print(f"\n{title}")
     print("-" * 40)
@@ -216,10 +208,6 @@ def print_class_distribution(labels, title):
 
 
 def calculate_target_count(current_count):
-    """
-    Calculate a safe augmentation target
-    for one minority class.
-    """
 
     maximum_allowed = (
         current_count * MAX_AUGMENT_MULTIPLIER
@@ -233,15 +221,9 @@ def calculate_target_count(current_count):
     return target_count
 
 
-# TRAINING DATA AUGMENTATION
-
+# training data augmentation
+# Create more ECG samples for minority classes
 def augment_training_data(ecg_signals, labels):
-    """
-    Generate additional ECG samples for minority classes.
-
-    Class N is not augmented because it already
-    contains significantly more samples.
-    """
 
     random_generator = np.random.default_rng(
         RANDOM_SEED
@@ -328,8 +310,7 @@ def augment_training_data(ecg_signals, labels):
         np.int64,
         copy=False,
     )
-
-    # Shuffle the final training dataset.
+# shuffle traning data
     shuffle_indices = random_generator.permutation(
         len(augmented_labels)
     )
@@ -344,15 +325,9 @@ def augment_training_data(ecg_signals, labels):
 
     return augmented_signals, augmented_labels
 
-# CLASS WEIGHTS
+# class weight calculation
 
 def calculate_class_weights(labels):
-    """
-    Calculate class weights from the original training data.
-
-    These weights are optional and can be used by model members
-    instead of augmentation when training a model.
-    """
 
     total_samples = len(labels)
     number_of_classes = len(CLASS_NAMES)
@@ -379,14 +354,13 @@ def calculate_class_weights(labels):
     return class_weights
 
 
-# SAVE DATA
+# save data
 
 def save_augmented_data(
     augmented_signals,
     augmented_labels,
     class_weights,
 ):
-    """Save augmented training data and class weights."""
 
     AUGMENTED_DIR.mkdir(
         parents=True,
@@ -409,8 +383,8 @@ def save_augmented_data(
     )
 
 
-# MAIN
-
+# Main
+# Augmentation control part
 def main():
 
     print("=" * 50)

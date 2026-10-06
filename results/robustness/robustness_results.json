@@ -1,0 +1,116 @@
+{
+    "CNN": {
+        "clean": {
+            "accuracy": 0.9148524698861753,
+            "macro_f1": 0.586908823276558,
+            "weighted_f1": 0.9102949652762404,
+            "snr_db": null,
+            "accuracy_drop_from_clean": 0.0,
+            "macro_f1_drop_from_clean": 0.0,
+            "macro_f1_drop_percent": 0.0
+        },
+        "low_30db": {
+            "accuracy": 0.9136921206763178,
+            "macro_f1": 0.5883104486244435,
+            "weighted_f1": 0.9084660356402742,
+            "snr_db": 30,
+            "accuracy_drop_from_clean": 0.0011603492098575252,
+            "macro_f1_drop_from_clean": -0.0014016253478854601,
+            "macro_f1_drop_percent": -0.2388148366999415
+        },
+        "medium_20db": {
+            "accuracy": 0.9061774781743839,
+            "macro_f1": 0.5640948353089392,
+            "weighted_f1": 0.8978844223533546,
+            "snr_db": 20,
+            "accuracy_drop_from_clean": 0.008674991711791424,
+            "macro_f1_drop_from_clean": 0.0228139879676188,
+            "macro_f1_drop_percent": 3.8871434646789402
+        },
+        "high_10db": {
+            "accuracy": 0.866615095590673,
+            "macro_f1": 0.48138591570808015,
+            "weighted_f1": 0.8493732172906266,
+            "snr_db": 10,
+            "accuracy_drop_from_clean": 0.048237374295502344,
+            "macro_f1_drop_from_clean": 0.10552290756847788,
+            "macro_f1_drop_percent": 17.979437926894875
+        }
+    },
+    "RNN_LSTM": {
+        "clean": {
+            "accuracy": 0.8039009835340921,
+            "macro_f1": 0.34186968289464914,
+            "weighted_f1": 0.7567141293662372,
+            "snr_db": null,
+            "accuracy_drop_from_clean": 0.0,
+            "macro_f1_drop_from_clean": 0.0,
+            "macro_f1_drop_percent": 0.0
+        },
+        "low_30db": {
+            "accuracy": 0.8039009835340921,
+            "macro_f1": 0.3443466681650721,
+            "weighted_f1": 0.7574786432245586,
+            "snr_db": 30,
+            "accuracy_drop_from_clean": 0.0,
+            "macro_f1_drop_from_clean": -0.002476985270422949,
+            "macro_f1_drop_percent": -0.7245407809929314
+        },
+        "medium_20db": {
+            "accuracy": 0.7983202563819206,
+            "macro_f1": 0.34571438121971887,
+            "weighted_f1": 0.7555220456626612,
+            "snr_db": 20,
+            "accuracy_drop_from_clean": 0.005580727152171505,
+            "macro_f1_drop_from_clean": -0.0038446983250697286,
+            "macro_f1_drop_percent": -1.1246093226273342
+        },
+        "high_10db": {
+            "accuracy": 0.7724057906951044,
+            "macro_f1": 0.35515909686748376,
+            "weighted_f1": 0.7526812750825279,
+            "snr_db": 10,
+            "accuracy_drop_from_clean": 0.03149519283898772,
+            "macro_f1_drop_from_clean": -0.013289413972834618,
+            "macro_f1_drop_percent": -3.8872747826925313
+        }
+    },
+    "Transformer": {
+        "clean": {
+            "accuracy": 0.6346557630677423,
+            "macro_f1": 0.4852283835893226,
+            "weighted_f1": 0.7301160389325136,
+            "snr_db": null,
+            "accuracy_drop_from_clean": 0.0,
+            "macro_f1_drop_from_clean": 0.0,
+            "macro_f1_drop_percent": 0.0
+        },
+        "low_30db": {
+            "accuracy": 0.6364791689689469,
+            "macro_f1": 0.48569978824750243,
+            "weighted_f1": 0.7314961718731132,
+            "snr_db": 30,
+            "accuracy_drop_from_clean": -0.0018234059012045556,
+            "macro_f1_drop_from_clean": -0.00047140465817985255,
+            "macro_f1_drop_percent": -0.09715108887340566
+        },
+        "medium_20db": {
+            "accuracy": 0.6390208862857775,
+            "macro_f1": 0.48397291869370135,
+            "weighted_f1": 0.7321246553833243,
+            "snr_db": 20,
+            "accuracy_drop_from_clean": -0.004365123218035172,
+            "macro_f1_drop_from_clean": 0.0012554648956212278,
+            "macro_f1_drop_percent": 0.2587369037100274
+        },
+        "high_10db": {
+            "accuracy": 0.6213946292408001,
+            "macro_f1": 0.4563892818645628,
+            "weighted_f1": 0.7091470426078367,
+            "snr_db": 10,
+            "accuracy_drop_from_clean": 0.013261133826942162,
+            "macro_f1_drop_from_clean": 0.028839101724759786,
+            "macro_f1_drop_percent": 5.9434078261110175
+        }
+    }
+}

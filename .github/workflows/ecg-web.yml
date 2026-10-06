@@ -1,0 +1,61 @@
+name: ECG web checks
+
+on:
+  push:
+    paths:
+      - 'web/**'
+      - 'preprocessing.py'
+      - '*_model.py'
+      - 'results/**'
+      - 'saved_models/**'
+      - 'processed_data/split/**'
+      - '.github/workflows/ecg-web.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'preprocessing.py'
+      - '*_model.py'
+      - 'results/**'
+      - 'saved_models/**'
+      - 'processed_data/split/**'
+      - '.github/workflows/ecg-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ecg-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - run: npm --prefix web test
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            web/backend/requirements.txt
+            web/backend/requirements-trained.txt
+      - name: Install CPU inference runtime
+        run: python -m pip install 'torch>=2.6,<3' --index-url https://download.pytorch.org/whl/cpu
+      - run: python -m pip install -r web/backend/requirements-trained.txt
+      - name: Test API and shared preprocessing contract
+        run: python -m unittest discover -s web/backend -p test_api.py -v
+      - name: Test heartbeat exporter
+        run: python -m unittest discover -s web/scripts -p test_export_heartbeat.py -v
+      - name: Verify trained checkpoints against API
+        run: python web/scripts/verify_trained_integration.py --report .local/integration-verification.json
+      - run: npm --prefix web run build

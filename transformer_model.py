@@ -63,7 +63,11 @@ class ECGTransformer(nn.Module):
     def _make_position_encoding(length, dimension):
         position = torch.arange(length, dtype=torch.float32).unsqueeze(1)
         scale = torch.exp(torch.arange(0, dimension, 2) * (-math.log(10000.0) / dimension))
+feature/ecg-transformer
         encoding = torch.zeros(length, dimension)x
+  
+        encoding = torch.zeros(length, dimension)
+ main
         encoding[:, 0::2] = torch.sin(position * scale)
         encoding[:, 1::2] = torch.cos(position * scale[:encoding[:, 1::2].shape[1]])
         return encoding.unsqueeze(0)
