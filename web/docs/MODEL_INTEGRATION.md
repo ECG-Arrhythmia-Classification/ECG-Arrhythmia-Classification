@@ -1,108 +1,97 @@
-# Tích hợp checkpoint của nhóm
+# Tích hợp model đã huấn luyện
 
-Repo đã có trọng số CNN ở `results/cnn/best_cnn_model.pt` và RNN ở `saved_models/best_rnn_model.pth`. Web vẫn dùng prototype demo cho đến khi nhóm export và cấu hình TorchScript. CNN lưu checkpoint dict chứa `model_state_dict`, còn RNN lưu trực tiếp `state_dict`; đây không phải file TorchScript để đưa thẳng vào `torch.jit.load`. Các đường dẫn `checkpoints/*.ts.pt` dưới đây là ví dụ cho file export, chưa có sẵn trong repo.
+Backend mặc định dùng `ECG_RUNTIME=trained`: nạp trực tiếp kiến trúc và checkpoint của nhóm từ repository. TorchScript là tùy chọn cho model thay thế, không phải bước bắt buộc cho ba model hiện có.
 
-## Thống nhất dữ liệu trước khi huấn luyện
+## Hợp đồng dữ liệu
 
-| Thành phần | Hợp đồng |
+| Thành phần | Quy ước |
 |---|---|
-| Heartbeat | Một đoạn 180 mẫu ở 360 Hz |
-| Dữ liệu RAW | `processed_data/split/X_<train\|val\|test>.npy` |
-| Nhãn | `0=N, 1=S, 2=V, 3=F, 4=Q` |
-| Tiền xử lý team | Butterworth bandpass 0,5–40 Hz bậc 4, `sosfiltfilt`, Z-score mỗi heartbeat |
-| Dữ liệu sau xử lý | `processed_data/preprocessed/`, tạo bởi `python preprocessing.py` |
-| CNN | Tensor float32 `[batch, 1, 180]` |
-| RNN | Tensor float32 `[batch, 180, 1]` |
-| Transformer | Layout phải khớp model export; ví dụ model ở nhánh `771d955` nhận `[batch, 1, 180]` |
-| Đầu ra | Tensor `[batch, 5]`; inference một mẫu chấp nhận `[1,5]` hoặc `[5]` |
+| Đầu vào web/API trained | Một heartbeat RAW, 180 mẫu, 360 Hz |
+| Test RAW | `processed_data/split/X_test.npy`, `y_test.npy` |
+| Tiền xử lý | `preprocessing.py`: Butterworth 0,5–40 Hz bậc 4, `sosfiltfilt`, Z-score mỗi heartbeat |
+| CNN / Transformer | Tensor float32 `[batch, 1, 180]` |
+| BiLSTM | Tensor float32 `[batch, 180, 1]` |
+| Đầu ra native | Logits `[batch, 5]` |
+| Thứ tự lớp | `0=N, 1=S, 2=V, 3=F, 4=Q` |
+| Xác suất | Softmax năm logits; hữu hạn, tổng bằng 1 |
 
-**`data_loader.py` hiện đọc `processed_data/split/` (RAW), chưa tự đọc thư mục `preprocessed`.** Khi huấn luyện cho adapter `team`, dùng dữ liệu từ `processed_data/preprocessed/` hoặc gọi cùng `preprocess_data` trong loader của model. Giữ split theo record hiện có; chỉ áp dụng augmentation trên train. Validation và test dùng cùng pipeline, không augmentation.
+Không gửi tín hiệu từ `processed_data/preprocessed/` vào API: pipeline sẽ lọc và chuẩn hóa lần thứ hai. Tệp ECG dài hơn một heartbeat cần được cắt đúng R-peak theo dataset trước khi tải lên; web không tự nhận diện R-peak hay suy ra sampling rate từ CSV. Không resample tùy ý thành 180 điểm để coi là cùng dữ liệu với test set.
 
-Với trọng số đã có, phải xác nhận tiền xử lý của lần huấn luyện trước khi chọn pipeline API. `train_cnn.py` có thể fallback sang RAW split nếu thiếu dữ liệu preprocessed; `results/cnn/config.json` và log/dữ liệu thực tế của lần train cần được đối chiếu. Không mặc định kết luận trọng số CNN hiện tại tương thích `team`. Nếu checkpoint dùng pipeline khác, cần adapter tương ứng; pipeline demo 256 mẫu không thay thế RAW 180 mẫu.
+Backend import pipeline của nhóm thay vì viết lại bộ lọc. API trả lại tín hiệu đã xử lý cùng metadata trong `preprocessing`, để frontend hiển thị chính dữ liệu dùng cho inference.
 
-Thứ tự 5 giá trị đầu ra bắt buộc là **N, S, V, F, Q**. Không đảo thứ tự lớp giữa checkpoint và API. Nếu model sử dụng shape hoặc preprocessing khác, phải khai báo/cập nhật adapter tương ứng trước khi sử dụng.
+## Nạp native checkpoint
 
-## Export TorchScript
+| Model id | Model | Trọng số | Cách nạp |
+|---|---|---|---|
+| `cnn` | `ECGCNN` trong `cnn_model.py` | `results/cnn/best_cnn_model.pt` | Lấy `model_state_dict` trong checkpoint dict |
+| `rnn` | `ECG_RNN`, BiLSTM hai lớp, hidden size 32 | `saved_models/best_rnn_model.pth` | Nạp trực tiếp `state_dict` |
+| `transformer` | `ECGTransformer` trong `transformer_model.py` | `results/transformer/best_model.pt` | Nạp trực tiếp `state_dict` |
 
-Cài PyTorch vào môi trường chạy API khi cần checkpoint:
+Transformer dùng embedding dimension 32, 4 heads, 2 encoder layers và patch size 4 theo code đánh giá. CNN/BiLSTM cũng dùng cấu hình tương ứng trong `evaluation/evaluate_models.py`. Khi thay checkpoint, phải giữ kiến trúc, shape và thứ tự lớp tương ứng hoặc sửa adapter cùng lúc. Backend đưa model về CPU và gọi `.eval()` trước inference.
 
-```bash
-python -m pip install torch
-```
+Không tự train, tuning hoặc đổi trọng số khi khởi động web. Checkpoint thiếu, sai state_dict hoặc output lỗi sẽ được báo unavailable/HTTP 503. Không có fallback prototype trong runtime trained.
 
-Khởi tạo đúng kiến trúc/cấu hình model và nạp trọng số: CNN lấy `checkpoint["model_state_dict"]`, RNN dùng state_dict đã lưu, rồi gọi `model.load_state_dict(...)`. Sau đó đưa model lên CPU và chuyển sang evaluation. Ví dụ cho model CNN đã được nạp trọng số, có đầu vào `[batch,1,180]`:
+CNN là lựa chọn mặc định theo kết quả đánh giá hiện có: Accuracy 91,49%, Macro F1 0,5869. Đây là căn cứ chọn model cho demo, không phải cam kết chất lượng y tế. Việc tích hợp dùng pipeline giống code evaluation; lịch sử huấn luyện CNN vẫn cần nhóm xác nhận vì `train_cnn.py` có nhánh fallback dữ liệu RAW khi thiếu dữ liệu đã xử lý.
 
-```python
-from pathlib import Path
-import torch
+## Biến môi trường
 
-# model phải là model của nhóm đã được nạp trọng số đã huấn luyện.
-model = model.cpu().eval()
-scripted = torch.jit.script(model)
-with torch.inference_mode():
-    output = scripted(torch.zeros(1, 1, 180, dtype=torch.float32))
-assert output.shape == (1, 5)
-assert torch.isfinite(output).all()
-Path("checkpoints").mkdir(exist_ok=True)
-scripted.save("checkpoints/cnn.ts.pt")
-```
+Backend đọc biến môi trường của process, **không tự nạp `.env`**. `web/backend/.env.example` là mẫu cấu hình; xem giá trị thực tế trong file trước khi áp dụng. Mặc định trained không cần khai báo đường dẫn checkpoint.
 
-Ví dụ này không huấn luyện hay tự nạp trọng số. Với RNN, probe bằng `torch.zeros(1,180,1)`. Với Transformer, dùng đúng layout của model export: code ở nhánh `771d955` nhận `[batch,1,180]`, cần `channels_first`; nhánh này chưa được merge vào main. API mặc định Transformer là `sequence`, nên phải override nếu model dùng layout khác. Nếu model trả về tuple/dict (ví dụ logits và hidden state), bọc lại để TorchScript trả về **một Tensor** chứa logits/probabilities. Kiểm tra đầu ra TorchScript khớp model gốc trên cùng heartbeat đã tiền xử lý.
-
-## Cấu hình backend
-
-Mỗi model có các biến môi trường:
-
-| Biến | Giá trị |
+| Biến | Ý nghĩa |
 |---|---|
-| `ECG_<MODEL>_CHECKPOINT` | File TorchScript; đường dẫn tương đối tính từ gốc repo |
-| `ECG_<MODEL>_PIPELINE` | `team` mặc định khi có checkpoint; `demo` chỉ khi checkpoint được huấn luyện theo đúng pipeline demo 256 mẫu |
+| `ECG_RUNTIME` | `trained` mặc định; `demo` khi chủ động muốn prototype |
+| `ECG_<MODEL>_CHECKPOINT` | Override đường dẫn; đường dẫn tương đối tính từ gốc repo |
+| `ECG_<MODEL>_CHECKPOINT_FORMAT` | `native` cho checkpoint của nhóm; `torchscript` cho file đã export |
+| `ECG_<MODEL>_PIPELINE` | `team` cho RAW 180 mẫu; chỉ dùng pipeline khác nếu đúng model huấn luyện |
 | `ECG_<MODEL>_INPUT_LAYOUT` | `channels_first` cho `[1,1,L]`; `sequence` cho `[1,L,1]` |
-| `ECG_<MODEL>_OUTPUT_KIND` | `logits` mặc định; hoặc `probabilities` nếu model đã softmax |
+| `ECG_<MODEL>_OUTPUT_KIND` | `logits` mặc định; `probabilities` khi model đã softmax |
+| `ECG_ALLOWED_ORIGINS` | Origin frontend được phép gọi API; cấu hình khi triển khai online |
+| `ECG_TORCH_THREADS` | Số CPU Torch threads từ 1 đến 32; mặc định 2 cho native inference |
 
-`<MODEL>` là `CNN`, `RNN` hoặc `TRANSFORMER`. Bỏ biến `CHECKPOINT` để model tương ứng tiếp tục chạy prototype demo. Checkpoint được khai báo nhưng thiếu/lỗi sẽ báo unavailable / HTTP 503; API không âm thầm thay bằng demo. Probability phải hữu hạn, nằm trong `[0,1]` và tổng bằng 1.
+`<MODEL>` là `CNN`, `RNN` hoặc `TRANSFORMER`. Chỉ đặt override khi cần thay model; giữ mặc định để dùng checkpoint hiện có.
 
-PowerShell, từ gốc repo và sau khi kích hoạt môi trường ảo:
+Ví dụ chạy trained bằng PowerShell tại gốc repo:
+
+```powershell
+$env:ECG_RUNTIME='trained'
+.\.venv\Scripts\python.exe -m uvicorn app:app --app-dir web/backend --host 127.0.0.1 --port 8000
+```
+
+Ví dụ dùng TorchScript CNN do nhóm tự export:
 
 ```powershell
 $env:ECG_CNN_CHECKPOINT='checkpoints/cnn.ts.pt'
+$env:ECG_CNN_CHECKPOINT_FORMAT='torchscript'
 $env:ECG_CNN_PIPELINE='team'
 $env:ECG_CNN_INPUT_LAYOUT='channels_first'
 $env:ECG_CNN_OUTPUT_KIND='logits'
-python -m uvicorn app:app --app-dir web/backend --host 127.0.0.1 --port 8000
 ```
 
-macOS / Linux:
+File `.ts.pt` không có sẵn trong repo. Khi export, khởi tạo đúng model, nạp trọng số, chuyển CPU/evaluation, rồi dùng `torch.jit.script` hoặc trace phù hợp. So sánh output native và TorchScript trên cùng heartbeat đã tiền xử lý; không dùng random/untrained model làm bản export trình diễn kết quả thật.
 
-```bash
-export ECG_CNN_CHECKPOINT=checkpoints/cnn.ts.pt
-export ECG_CNN_PIPELINE=team
-export ECG_CNN_INPUT_LAYOUT=channels_first
-export ECG_CNN_OUTPUT_KIND=logits
-python -m uvicorn app:app --app-dir web/backend --host 127.0.0.1 --port 8000
+## Dữ liệu thật và kết quả đánh giá
+
+`GET /examples` liệt kê mẫu đại diện từ RAW test set; `GET /examples/{index}` trả tín hiệu và nhãn tham chiếu của heartbeat tương ứng. Mẫu được lấy từ dữ liệu thật khi các tệp Git LFS có mặt. API phải báo thiếu dữ liệu nếu tệp không tồn tại hoặc còn là LFS pointer, không thay bằng tín hiệu tổng hợp.
+
+`GET /evaluation` đọc các artifact đã lưu:
+
+- `results/evaluation/evaluation_results.json`: metric và confusion matrix ba model.
+- `results/benchmark/benchmark_results.json`: số parameter và thời gian inference.
+- `results/robustness/robustness_results.json`: clean, 30 dB, 20 dB, 10 dB.
+
+Bảng tổng hợp của nhóm cũng được lưu ở `results/summary/model_comparison.csv`; endpoint tạo các dòng hiển thị từ ba JSON ở trên.
+
+Các số này là kết quả offline của nhóm, không phải đánh giá được chạy lại mỗi khi tải trang. Timing benchmark được đo theo batch trên môi trường chạy của nhóm; không so trực tiếp với độ trễ một request trên máy người xem. Chưa có thời gian huấn luyện RNN/Transformer đầy đủ; không điền số giả vào báo cáo.
+
+Xuất CSV RAW khi cần demo upload:
+
+```powershell
+.\.venv\Scripts\python.exe web/scripts/export_heartbeat.py --split test --index 0 --output exports/test-beat-0.csv
 ```
 
-`web/backend/.env.example` liệt kê cấu hình cho cả 3 model. Backend **không tự nạp dotenv**. Nếu sao chép thành `web/backend/.env`, sửa giá trị rồi nạp file vào process trước khi chạy; ví dụ Bash:
+Script chỉ xuất cột `signal` và in nhãn tham chiếu. Khi tên file đã tồn tại cần `--force` để ghi đè. CSV mẫu tổng hợp trong `web/public/samples/` dùng cho prototype, không dùng làm test set của model thật.
 
-```bash
-set -a
-source web/backend/.env
-set +a
-```
-
-Không nạp nguyên file ví dụ khi chưa có checkpoint: các đường dẫn ví dụ chưa tồn tại sẽ khiến model unavailable.
-
-## Thử từ dữ liệu của repo
-
-```bash
-python web/scripts/export_heartbeat.py --split test --index 0 --output exports/test-beat-0.csv
-```
-
-RAW split `.npy` được lưu bằng Git LFS. Sau khi cài Git LFS, chạy `git lfs pull` rồi `python verify_dataset.py` từ gốc repo theo README gốc trước khi chạy exporter. Tệp CSV xuất ra có 180 giá trị **RAW** ở cột `signal`. Tải tệp này vào web local, bật chế độ FastAPI, kiểm tra kết nối rồi chạy model tương ứng. Nhãn in bởi exporter là nhãn tham chiếu để kiểm tra, không phải kết quả model.
-
-Với checkpoint `team`, API thực hiện tiền xử lý của `preprocessing.py` và không resample; các toggle preprocessing demo trên frontend không thay đổi pipeline này. `POST /predict` nhận RAW và trả lại tín hiệu đã xử lý trong `preprocessing.signal`, cùng metadata của pipeline. Không gửi `processed_data/preprocessed/` vào API vì sẽ lọc/Z-score lần thứ hai. UI có thể tạo mẫu tổng hợp 180 điểm khi chọn model pipeline `team` để kiểm tra kết nối và chạy thử checkpoint. Mẫu này vẫn chỉ là minh họa; cần CSV RAW thật của repo để đối chiếu model và không suy ra chất lượng model từ tín hiệu tổng hợp.
-
-Ví dụ request khi đã có API local:
+Thử prediction trực tiếp bằng Python:
 
 ```python
 import httpx
@@ -119,12 +108,12 @@ result = response.json()
 print(result["prediction"], result["is_demo"], result["preprocessing"])
 ```
 
-`httpx` đã có trong dependency của API; có thể dùng Swagger `/docs` thay thế.
+Kiểm tra `is_demo=false` và runtime/pipeline của `/models` trước khi ghi lại kết quả thật. Nhãn tham chiếu và lớp dự đoán có thể khác nhau; hiển thị cả hai khi demo mẫu test. Xác suất cao của một mẫu không thay thế Accuracy/F1 toàn tập và không phải xác suất bệnh lý đã được hiệu chuẩn.
 
-## Đưa checkpoint lên web online
+## Triển khai cho người xem online
 
-Hiện workflow chỉ kiểm tra và build, chưa cấu hình publish. Khi chủ repo quyết định triển khai, có thể dùng GitHub Pages để phục vụ frontend tĩnh. Pages không chạy backend: cần triển khai FastAPI ở dịch vụ/server riêng có HTTPS, cài dependency và PyTorch, cung cấp checkpoint và biến môi trường. Đặt `ECG_ALLOWED_ORIGINS` thành origin thực tế của frontend, ví dụ `https://your-team.github.io` (không thêm đường dẫn repository hoặc dấu `/` cuối).
+Frontend tĩnh không chạy PyTorch. Cần host FastAPI riêng, cung cấp code kiến trúc, `preprocessing.py`, checkpoint và các artifact kết quả. Muốn dùng thư viện mẫu test online, cung cấp cả hai tệp RAW test; không cần train/validation cho inference.
 
-Trong frontend, nhập URL HTTPS qua **Kết nối model**. Hoặc đặt `VITE_API_URL` lúc build, ví dụ `VITE_API_URL=https://api.example.com`; đây là địa chỉ công khai, không chứa token. Khi URL thay đổi cần build lại để cập nhật giá trị mặc định. Không kết nối API HTTP từ trang web HTTPS vì trình duyệt có thể chặn mixed content; chạy web local để thử API local.
+Cài `web/backend/requirements-trained.txt`, dùng HTTPS, đặt `ECG_ALLOWED_ORIGINS` thành origin frontend thực tế, rồi cấu hình `VITE_API_URL` khi build React. Origin không chứa đường dẫn repository hoặc dấu `/` cuối. Không đưa token/secret vào biến `VITE_*`.
 
-Trước khi chia sẻ kết quả thật, kiểm tra `/models` báo `torchscript`, `is_demo=false`, shape/pipeline đúng; kiểm tra JSON kết quả cũng ghi `is_demo=false`. Đánh giá accuracy/F1/confusion matrix trên toàn test set bằng code evaluation của nhóm. Một lần dự đoán trên web không phải báo cáo chất lượng model.
+Kiểm tra `/health`, `/models`, prediction của một mẫu thật và tải JSON sau triển khai. Web đã host trước đây chỉ thay đổi khi chủ repo chủ động build/publish bản mới; chạy local không cập nhật website online.

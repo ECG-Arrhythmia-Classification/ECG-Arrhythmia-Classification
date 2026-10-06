@@ -1,74 +1,104 @@
 # ECG Studio
 
-Web của dự án để tải một heartbeat, xem tín hiệu, chạy phân loại N/S/V/F/Q và so sánh CNN, RNN/LSTM/GRU, Transformer. Giao diện React chạy độc lập; FastAPI là phần tùy chọn để tích hợp checkpoint của nhóm.
+Web React + FastAPI tích hợp dữ liệu, tiền xử lý và ba checkpoint đã huấn luyện của nhóm. Mặc định chạy **CNN thật**; có thể đối chiếu prediction với BiLSTM và Transformer, xem kết quả đánh giá test set, tải báo cáo JSON và sơ đồ hệ thống.
 
-**Trạng thái hiện tại:** repo đã có trọng số CNN (`results/cnn/best_cnn_model.pt`) và RNN (`saved_models/best_rnn_model.pth`). Web vẫn chạy prototype demo đến khi nhóm export và cấu hình TorchScript; các trọng số trên không được API tự nạp. Chế độ demo dùng tín hiệu tổng hợp, xác suất không phải độ chính xác trên MIT-BIH. Đây là công cụ trình diễn học thuật, không dùng để chẩn đoán.
+Web nhận **một heartbeat RAW gồm 180 mẫu ở 360 Hz**. API gọi trực tiếp `preprocessing.py`: bandpass Butterworth 0,5–40 Hz bậc 4, sau đó Z-score từng heartbeat. Thứ tự nhãn đầu ra là **N, S, V, F, Q**. Đây là công cụ trình diễn học thuật; xác suất softmax chưa được hiệu chuẩn và không phải độ chính xác của một dự đoán.
 
-## Chạy web
+## Chạy local trên Windows
 
-Thực hiện các lệnh từ thư mục gốc repository. Khuyến nghị Node.js 24 để khớp CI; web hỗ trợ Node.js 20 trở lên:
+Từ thư mục gốc repository, dùng Python 3.12 trở lên và Node.js 20 trở lên:
 
-```bash
+```powershell
+.\web\scripts\setup.ps1
+.\web\scripts\run-local.ps1
+```
+
+Mở `http://127.0.0.1:5173`; API tại `http://127.0.0.1:8000`, tài liệu API tại `http://127.0.0.1:8000/docs`. Script setup cài PyTorch CPU và dependency vào môi trường ảo của project, tải dữ liệu Git LFS nếu cần và kiểm tra dataset; không huấn luyện lại model. Cần kết nối mạng cho lần cài đầu tiên. Nếu PowerShell chặn script, có thể chạy từng lệnh thủ công bên dưới. Giữ terminal của `run-local.ps1` mở; nhấn **Ctrl+C** để dừng cả hai server.
+
+Để chọn heartbeat từ test set, tải các tệp RAW được quản lý bằng Git LFS:
+
+```powershell
+git lfs install
+git lfs pull
+.\.venv\Scripts\python.exe verify_dataset.py
+```
+
+Không cần tải lại MIT-BIH gốc hoặc tạo split mới để demo. Checkpoint và kết quả đánh giá nằm trong repo; các mẫu test cần tệp `processed_data/split/X_test.npy` và `y_test.npy` đã tải đầy đủ, không phải pointer Git LFS.
+
+## Chạy thủ công
+
+Tạo môi trường ảo và cài dependency tại gốc repo:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install 'torch>=2.6,<3' --index-url https://download.pytorch.org/whl/cpu
+.\.venv\Scripts\python.exe -m pip install -r web/backend/requirements-trained.txt
 npm --prefix web ci
+```
+
+Chạy API trong terminal thứ nhất:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app:app --app-dir web/backend --host 127.0.0.1 --port 8000
+```
+
+Chạy frontend trong terminal thứ hai:
+
+```powershell
 npm --prefix web run dev
 ```
 
-Mở `http://127.0.0.1:5173`. Chế độ demo chạy ngay, không cần Python hoặc dữ liệu MIT-BIH. Có các tệp minh họa trong `web/public/samples/`.
+macOS/Linux dùng `python3 -m venv .venv`, sau đó thay đường dẫn Python bằng `.venv/bin/python`. Các lệnh npm và uvicorn giữ nguyên. Web local kết nối API ở cổng 8000; có thể đổi bằng **Kết nối model** hoặc `VITE_API_URL` trong `web/.env.local` trước khi chạy/build Vite.
 
-## Chạy API tùy chọn
+## Sử dụng
 
-Khuyến nghị Python 3.12 để khớp CI; backend hỗ trợ Python 3.10 trở lên. Từ gốc repo, tạo và kích hoạt môi trường ảo:
+1. Chọn một heartbeat thật trong test set hoặc tải CSV/JSON chứa một cột/mảng tín hiệu RAW 180 giá trị. Nhãn đi kèm mẫu test là nhãn tham chiếu, không phải prediction.
+2. Xem biểu đồ trước/sau tiền xử lý; pipeline của checkpoint được API cố định theo pipeline đánh giá của nhóm.
+3. Chạy CNN để xem nhóm nhịp dự đoán và xác suất của cả năm lớp. Chạy so sánh để đối chiếu cả ba model trên cùng đầu vào.
+4. Mở phần đánh giá để xem Accuracy, Precision, Recall, Macro F1, confusion matrix, benchmark và kiểm thử nhiễu đã lưu của nhóm.
+5. Xuất JSON kết quả, xem sơ đồ kiến trúc và dùng [kịch bản demo](docs/DEMO_GUIDE.md) để trình bày. [Báo cáo tích hợp](docs/INTEGRATION_REPORT.md) ghi phần đã làm và phép kiểm chứng checkpoint/API.
 
-```bash
-python -m venv .venv
-```
+Chọn CNN làm mặc định vì đây là model tốt nhất theo Accuracy và Macro F1 trong kết quả đánh giá hiện có:
 
-PowerShell:
+| Model | Accuracy | Macro F1 |
+|---|---:|---:|
+| CNN | 91,49% | 0,5869 |
+| BiLSTM | 80,39% | 0,3419 |
+| Transformer | 63,47% | 0,4852 |
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
+Nguồn: `results/evaluation/evaluation_results.json`, cùng 18.098 heartbeat test. Điểm toàn tập không bảo đảm một mẫu sẽ được dự đoán đúng. CNN còn yếu ở lớp S và F; khi trình bày cần đọc cả Macro F1 và confusion matrix, không chỉ Accuracy.
 
-macOS / Linux:
+## Checkpoint và API
 
-```bash
-source .venv/bin/activate
-```
+| Model | Kiến trúc trong repo | Checkpoint được nạp trực tiếp |
+|---|---|---|
+| CNN | `cnn_model.py` | `results/cnn/best_cnn_model.pt` |
+| BiLSTM | `rnn_model.py` | `saved_models/best_rnn_model.pth` |
+| Transformer | `transformer_model.py` | `results/transformer/best_model.pt` |
 
-Cài dependency và chạy API:
+Không cần export TorchScript để chạy các checkpoint này. Backend chạy CPU, dùng evaluation mode và inference mode. Model hoặc dependency thiếu/lỗi phải được báo rõ; chế độ trained không tự thay bằng prototype.
 
-```bash
-python -m pip install -r web/backend/requirements.txt
-python -m uvicorn app:app --app-dir web/backend --host 127.0.0.1 --port 8000
-```
+API có `GET /health`, `GET /models`, `GET /examples`, `GET /examples/{index}`, `GET /evaluation`, `POST /preprocess`, `POST /predict`. Chi tiết định dạng và cấu hình checkpoint: [MODEL_INTEGRATION.md](docs/MODEL_INTEGRATION.md).
 
-Trong web local, chọn **Kết nối model → FastAPI / checkpoint**, nhập `http://127.0.0.1:8000`, kiểm tra kết nối rồi áp dụng. Có thể đặt URL mặc định bằng `VITE_API_URL` trong `web/.env.local`; Vite đọc biến này lúc chạy/build. API không tự đọc `web/backend/.env.example`.
-
-API có `GET /health`, `GET /models`, `POST /preprocess`, `POST /predict`; tài liệu tương tác tại `http://127.0.0.1:8000/docs`.
-
-## Dùng dữ liệu và model của nhóm
-
-- Nhóm dùng heartbeat **180 mẫu, 360 Hz**, nhãn `0=N, 1=S, 2=V, 3=F, 4=Q`.
-- RAW split ở `processed_data/split/` được lưu bằng Git LFS. Cài Git LFS, chạy `git lfs pull` rồi `python verify_dataset.py` từ gốc repo trước khi export; xem hướng dẫn trong README gốc. Không tự tạo split khác cho từng model.
-- Khi đã có RAW split, xuất một heartbeat để tải vào web:
-
-```bash
-python web/scripts/export_heartbeat.py --split test --index 0 --output exports/test-beat-0.csv
-```
-
-Script chỉ xuất cột `signal` và in nhãn tham chiếu; không chỉnh dữ liệu nguồn. Chạy lại với cùng tên cần `--force`. Tệp CSV không phải kết quả dự đoán và không tự được thêm vào Git.
-
-- Adapter checkpoint mặc định dùng pipeline `team`: bandpass 0,5–40 Hz bậc 4 rồi Z-score từ `preprocessing.py`, giữ đúng 180 mẫu. Chỉ cấu hình pipeline này khi khớp tiền xử lý lúc huấn luyện; `train_cnn.py` có thể dùng RAW split khi thiếu dữ liệu preprocessed nên cần đối chiếu cấu hình và log của lần train trước khi tích hợp trọng số CNN. Khi dùng `team`, tải RAW vào API để tránh xử lý hai lần.
-- Demo dùng pipeline riêng, resample 256 mẫu. Kết quả demo không dùng để đánh giá model đã huấn luyện.
-- Hướng dẫn export TorchScript, cấu hình shape, lớp đầu ra và chạy từ web online: [MODEL_INTEGRATION.md](docs/MODEL_INTEGRATION.md).
+Prototype chỉ dùng khi chủ động đặt `ECG_RUNTIME=demo` hoặc chọn chế độ minh họa trong frontend. Mẫu tổng hợp và điểm prototype được gắn nhãn demo; chúng không thay thế checkpoint, dữ liệu test hoặc kết quả đánh giá.
 
 ## Kiểm tra và build
 
-```bash
+```powershell
 npm --prefix web test
 npm --prefix web run build
-python -m unittest discover -s web/backend -p "test_*.py"
-python -m unittest discover -s web/scripts -p "test_*.py"
+.\.venv\Scripts\python.exe -m unittest discover -s web/backend -p "test_*.py"
+.\.venv\Scripts\python.exe -m unittest discover -s web/scripts -p "test_*.py"
 ```
 
-Build tĩnh được ghi vào `web/dist/`. Workflow hiện chỉ kiểm tra và build; chưa cấu hình publish. Chủ repo có thể chủ động cấu hình GitHub Pages hoặc dịch vụ hosting để phục vụ build này sau. Pages không chạy Python hay PyTorch. Muốn web online dùng checkpoint thật, cần triển khai FastAPI riêng bằng HTTPS và cấu hình CORS cho đúng origin của web. Người xem vẫn dùng được demo khi chưa có API.
+Đối chiếu adapter API với kiến trúc/checkpoint gốc và chạy lại toàn test set, không ghi đè artifact đánh giá của nhóm:
+
+```powershell
+.\.venv\Scripts\python.exe web/scripts/verify_trained_integration.py --full-test --report .local/integration-verification.json
+```
+
+Lệnh này cần PyTorch và RAW test đã tải. Báo cáo ghi phiên bản runtime, SHA-256 checkpoint, độ lệch xác suất API/model gốc và kết quả đối chiếu confusion matrix; chạy cùng pipeline để phân biệt lỗi tích hợp với chất lượng checkpoint.
+
+Build tĩnh nằm trong `web/dist/`. GitHub Pages hoặc Sites chỉ phục vụ frontend; muốn người khác chạy model thật qua web online cần triển khai FastAPI riêng bằng HTTPS, cài dependency/checkpoint và cấu hình `ECG_ALLOWED_ORIGINS`. Đặt `VITE_API_URL` thành URL API khi build frontend. Không kết nối API HTTP từ một trang HTTPS.
+
+Chạy setup/demo không commit, push hay deploy. Website online chỉ cập nhật sau một lần build/publish do chủ repo thực hiện.

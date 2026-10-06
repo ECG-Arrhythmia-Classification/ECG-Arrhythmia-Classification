@@ -13,7 +13,7 @@ from unittest.mock import patch
 import numpy as np
 from fastapi.testclient import TestClient
 
-from app import CLASS_ORDER, CheckpointError, ModelConfig, PreprocessingOptions, PrototypeDemo, TorchScriptAdapter, create_app, demo_samples, environment_configs, load_team_preprocessing
+from app import CLASS_ORDER, PROJECT_ROOT, CheckpointError, ModelConfig, NativeCheckpointAdapter, PreprocessingOptions, PrototypeDemo, TorchScriptAdapter, create_app, demo_samples, environment_configs, load_evaluation, load_team_preprocessing, load_test_dataset
 
 
 def demo_configs() -> dict[str, ModelConfig]:
@@ -278,7 +278,9 @@ class SharedPipelineTests(unittest.TestCase):
             configs = environment_configs()
             self.assertEqual(configs["cnn"].pipeline, "team")
             self.assertEqual(configs["cnn"].input_shape(), [1, 1, 180])
-            self.assertEqual(configs["rnn"].pipeline, "demo")
+            self.assertEqual(configs["rnn"].pipeline, "team")
+            self.assertEqual(configs["rnn"].checkpoint_format, "native")
+            self.assertEqual(configs["transformer"].input_shape(), [1, 1, 180])
         with patch.dict("os.environ", {"ECG_CNN_CHECKPOINT": "models/best.ts.pt", "ECG_CNN_PIPELINE": "demo", "ECG_RNN_CHECKPOINT": "models/rnn.ts.pt"}, clear=True):
             configs = environment_configs()
             self.assertEqual(configs["cnn"].pipeline, "demo")
@@ -292,6 +294,133 @@ class SharedPipelineTests(unittest.TestCase):
         self.assertEqual(client.get("/models").json()["models"][0]["status"], "unavailable")
         self.assertEqual(client.post("/predict", json={"signal": self.raw.tolist(), "model": "cnn"}).status_code, 503)
         self.assertEqual(client.post("/preprocess", json={"signal": self.raw.tolist(), "model": "cnn"}).status_code, 503)
+
+
+class NativeCheckpointTests(unittest.TestCase):
+    def test_environment_uses_bundled_native_checkpoints_unless_demo_is_explicit(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            configs = environment_configs()
+        self.assertEqual([config.checkpoint_format for config in configs.values()], ["native"] * 3)
+        self.assertEqual([config.pipeline for config in configs.values()], ["team"] * 3)
+        self.assertTrue(all((PROJECT_ROOT / config.checkpoint_path).is_file() for config in configs.values()))
+        self.assertEqual(configs["rnn"].input_shape(), [1, 180, 1])
+        self.assertEqual(configs["transformer"].input_shape(), [1, 1, 180])
+        with patch.dict("os.environ", {"ECG_RUNTIME": "demo"}, clear=True):
+            demo = environment_configs()
+        self.assertTrue(all(config.checkpoint_path is None and config.pipeline == "demo" for config in demo.values()))
+
+    def test_native_loader_uses_safe_cpu_deserialization_and_strict_original_state(self) -> None:
+        from unittest.mock import Mock
+        for model_id, architecture_name in (("cnn", "ECGCNN"), ("rnn", "ECG_RNN"), ("transformer", "ECGTransformer")):
+            with self.subTest(model_id=model_id), tempfile.TemporaryDirectory() as directory:
+                checkpoint = Path(directory) / "native.pt"
+                checkpoint.write_bytes(b"mock state_dict contract")
+                module = Mock()
+                architecture = SimpleNamespace(**{architecture_name: Mock(return_value=module)})
+                state = {"layer.weight": "tensor placeholder"}
+                payload = {"model_state_dict": state, "epoch": 7} if model_id == "cnn" else state
+                torch = SimpleNamespace(load=Mock(return_value=payload), set_num_threads=Mock())
+                layout = "sequence" if model_id == "rnn" else "channels_first"
+                config = ModelConfig(model_id, str(checkpoint), layout, pipeline="team", checkpoint_format="native")
+                with patch("app.load_team_architecture", return_value=architecture), patch.object(NativeCheckpointAdapter, "predict", return_value=np.full(5, .2)), patch("app.importlib.import_module", return_value=torch):
+                    adapter = NativeCheckpointAdapter(config)
+                torch.load.assert_called_once_with(str(checkpoint), map_location="cpu", weights_only=True)
+                module.load_state_dict.assert_called_once_with(state, strict=True)
+                module.eval.assert_called_once()
+                self.assertEqual(adapter.backend, "native_pytorch")
+                self.assertFalse(adapter.is_demo)
+                self.assertEqual(adapter.checkpoint_metadata["name"], "native.pt")
+                self.assertEqual(len(adapter.checkpoint_metadata["sha256"]), 64)
+
+    def test_invalid_native_configuration_and_missing_dependency_fail_visibly(self) -> None:
+        configs = demo_configs()
+        configs["cnn"] = ModelConfig("cnn", pipeline="team", checkpoint_format="native")
+        client = TestClient(create_app(configs))
+        self.assertEqual(client.get("/models").json()["models"][0]["status"], "unavailable")
+        self.assertEqual(client.post("/predict", json={"signal": demo_samples()["N"].tolist()}).status_code, 503)
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / "native.pt"
+            checkpoint.write_bytes(b"mock state_dict contract")
+            configs["cnn"] = ModelConfig("cnn", str(checkpoint), "channels_first", pipeline="team", checkpoint_format="native")
+            with patch("app.importlib.import_module", side_effect=ModuleNotFoundError("torch missing")):
+                client = TestClient(create_app(configs))
+            error = client.post("/predict", json={"signal": demo_samples()["N"].tolist()})
+            self.assertEqual(error.status_code, 503)
+            self.assertIn("torch missing", error.json()["detail"]["message"])
+            self.assertEqual(client.get("/health").json()["status"], "degraded")
+
+
+class TeamArtifactApiTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        load_test_dataset.cache_clear()
+        load_evaluation.cache_clear()
+
+    def test_examples_return_raw_labels_and_deterministic_read_only_data(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            split = repository / "processed_data" / "split"
+            split.mkdir(parents=True)
+            signals = np.arange(7 * 180, dtype=np.float64).reshape(7, 180)
+            labels = np.asarray([2, 0, 2, 4, 1, 3, 0])
+            np.save(split / "X_test.npy", signals)
+            np.save(split / "y_test.npy", labels)
+            with patch("app.PROJECT_ROOT", repository):
+                client = TestClient(create_app(demo_configs()))
+                examples = client.get("/examples").json()
+                self.assertEqual([row["index"] for row in examples["samples"]], [1, 4, 0, 5, 3])
+                self.assertEqual([row["code"] for row in examples["samples"]], list(CLASS_ORDER))
+                self.assertEqual(examples["total"], 7)
+                self.assertFalse(examples["is_synthetic"])
+                sample = client.get("/examples/0").json()
+                self.assertEqual(sample["expected_class"]["code"], "V")
+                self.assertEqual(sample["signal"], signals[0].tolist())
+                self.assertEqual(sample["sample_rate"], 360)
+                self.assertEqual(client.get("/examples/-1").status_code, 404)
+                self.assertEqual(client.get("/examples/7").status_code, 404)
+                self.assertFalse(load_test_dataset(str(repository))[0].flags.writeable)
+                # HTTP error tracebacks can retain views; close only this temporary
+                # fixture's maps after all requests before Windows removes the files.
+                for mapped in load_test_dataset(str(repository)):
+                    mapped._mmap.close()
+                load_test_dataset.cache_clear()
+
+    def test_missing_data_and_lfs_pointers_return_503_without_synthetic_substitute(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = Path(directory)
+            with patch("app.PROJECT_ROOT", repository):
+                client = TestClient(create_app(demo_configs()))
+                for path in ("/examples", "/examples/0"):
+                    response = client.get(path)
+                    self.assertEqual(response.status_code, 503)
+                    self.assertEqual(response.json()["detail"]["code"], "dataset_unavailable")
+                split = repository / "processed_data" / "split"
+                split.mkdir(parents=True)
+                (split / "X_test.npy").write_text("version https://git-lfs.github.com/spec/v1\noid sha256:test\nsize 128\n", encoding="utf-8")
+                np.save(split / "y_test.npy", np.asarray([0]))
+                response = client.get("/examples")
+                self.assertEqual(response.status_code, 503)
+                self.assertIn("git lfs pull", response.json()["detail"]["message"])
+
+    def test_saved_evaluation_exposes_actual_team_results_and_provenance(self) -> None:
+        client = TestClient(create_app(demo_configs()))
+        response = client.get("/evaluation")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["source"], "saved_results")
+        self.assertEqual(body["test_samples"], 18098)
+        self.assertEqual([row["id"] for row in body["models"]], ["cnn", "rnn", "transformer"])
+        cnn = body["models"][0]
+        self.assertEqual(cnn["parameters"], 259109)
+        self.assertAlmostEqual(cnn["macro_f1"], .586908823276558)
+        self.assertEqual([row["snr_db"] for row in cnn["robustness"]], [30, 20, 10])
+        self.assertEqual(sum(sum(row) for row in cnn["confusion_matrix"]), body["test_samples"])
+        self.assertIn("not new measurements", body["notice"])
+
+    def test_missing_evaluation_returns_explicit_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch("app.PROJECT_ROOT", Path(directory)):
+            response = TestClient(create_app(demo_configs())).get("/evaluation")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"]["code"], "evaluation_unavailable")
 
 
 if __name__ == "__main__":

@@ -1,26 +1,26 @@
 export const CLASSES = [
-  {code:'N', label_vi:'Nhóm nhịp bình thường', label_en:'Normal group', color:'#0d8068', description:'Nhóm N trong phân loại heartbeat; kết quả không kết luận tình trạng sức khỏe.'},
-  {code:'S', label_vi:'Nhịp ngoại tâm thu trên thất', label_en:'Supraventricular ectopic', color:'#4374c4', description:'Nhóm S – heartbeat ngoại tâm thu trên thất.'},
-  {code:'V', label_vi:'Nhịp ngoại tâm thu thất', label_en:'Ventricular ectopic', color:'#d07833', description:'Nhóm V – heartbeat ngoại tâm thu thất.'},
-  {code:'F', label_vi:'Nhịp hợp nhất', label_en:'Fusion beat', color:'#8d61b7', description:'Nhóm F – heartbeat hợp nhất.'},
-  {code:'Q', label_vi:'Nhịp chưa phân loại', label_en:'Unclassified beat', color:'#637587', description:'Nhóm Q là một lớp minh họa riêng; không tự động coi tín hiệu nhiễu là Q.'},
+  {code:'N', label_en:'Normal beat group', color:'#0d8068', description:'Includes normal, bundle branch block, and escape beats under the project\'s class mapping.'},
+  {code:'S', label_en:'Supraventricular ectopic beat', color:'#4374c4', description:'Supraventricular premature or ectopic beats, including atrial and junctional beats.'},
+  {code:'V', label_en:'Ventricular ectopic beat', color:'#d07833', description:'Includes premature ventricular contractions and ventricular escape beats.'},
+  {code:'F', label_en:'Fusion beat', color:'#8d61b7', description:'Fusion of a ventricular beat and a normal beat.'},
+  {code:'Q', label_en:'Unclassifiable / paced beat', color:'#637587', description:'Includes unclassifiable, paced, and paced–normal fusion beats; signal noise alone does not define this class.'},
 ];
-export const MODELS = [{id:'cnn',name:'1D CNN',kind:'Hình thái',note:'Khoảng cách biên độ + đạo hàm'}, {id:'rnn',name:'LSTM / GRU',kind:'Chuỗi',note:'Khoảng cách tích lũy theo chuỗi'}, {id:'transformer',name:'Transformer',kind:'Toàn cục',note:'Khoảng cách theo vùng tín hiệu'}];
+export const MODELS = [{id:'cnn',name:'1D CNN',kind:'Morphology',note:'Amplitude and derivative distance'}, {id:'rnn',name:'BiLSTM',kind:'Sequence',note:'Cumulative sequence distance'}, {id:'transformer',name:'Transformer',kind:'Global context',note:'Region-weighted signal distance'}];
 const mean = a => a.reduce((s,v)=>s+v,0)/a.length;
 export function validateSignal(signal){
-  if(!Array.isArray(signal)||signal.length<32||signal.length>10000) throw new Error('Tín hiệu cần từ 32 đến 10.000 mẫu số của một heartbeat.');
-  if(signal.some(v=>typeof v!=='number'||!Number.isFinite(v)||Math.abs(v)>1e9)) throw new Error('Tín hiệu chứa giá trị không hợp lệ; mỗi mẫu cần là số hữu hạn trong ±1e9.');
+  if(!Array.isArray(signal)||signal.length<32||signal.length>10000) throw new Error('Provide between 32 and 10,000 numeric samples from a single heartbeat.');
+  if(signal.some(v=>typeof v!=='number'||!Number.isFinite(v)||Math.abs(v)>1e9)) throw new Error('Each ECG sample must be a finite number within ±1e9.');
   const m=mean(signal),sd=Math.sqrt(mean(signal.map(v=>(v-m)**2)));
-  if(sd<1e-8) throw new Error('Tín hiệu phẳng không đủ thông tin để phân loại.');
+  if(sd<1e-8) throw new Error('A flat signal does not contain enough information for classification.');
   return signal;
 }
 export function parseSignal(text,filename='signal.csv'){
-  if(text.length>2*1024*1024) throw new Error('Tệp vượt quá giới hạn 2 MB.');
+  if(text.length>2*1024*1024) throw new Error('The file exceeds the 2 MB limit.');
   let values;
   const trimmed=text.replace(/^\uFEFF/,'').trim();
-  if(!trimmed) throw new Error('Tệp trống. Vui lòng chọn tệp ECG khác.');
+  if(!trimmed) throw new Error('The file is empty. Select another ECG file.');
   if(filename.toLowerCase().endsWith('.json')||trimmed.startsWith('[')||trimmed.startsWith('{')){
-    let obj;try{obj=JSON.parse(trimmed)}catch{throw new Error('JSON không hợp lệ. Dùng một mảng số hoặc {"signal": [...]} .')}
+    let obj;try{obj=JSON.parse(trimmed)}catch{throw new Error('Invalid JSON. Use a numeric array or {"signal": [...]}.')}
     values=Array.isArray(obj)?obj:obj.signal;
   } else {
     const rows=trimmed.split(/\r?\n/).filter(r=>r.trim()).map(r=>r.trim().split(/[,;\t\s]+/));
@@ -29,14 +29,14 @@ export function parseSignal(text,filename='signal.csv'){
     if(rows[0].some(s=>!number(s))){
       const headers=rows[0].map(s=>s.toLowerCase());
       col=headers.findIndex(s=>['signal','ecg','amplitude','value'].includes(s));
-      if(col<0)throw new Error('CSV cần cột signal, ecg, amplitude hoặc value; tệp một cột có thể không cần tiêu đề.');
+      if(col<0)throw new Error('Use a CSV column named signal, ecg, amplitude, or value. A single-column file may omit the header.');
       start=1;
     } else if(rows.length===1) {
       values=rows[0].map(Number);
-    } else if(rows[0].length!==1)throw new Error('CSV nhiều cột cần tiêu đề để xác định cột ECG, ví dụ time,signal.');
+    } else if(rows[0].length!==1)throw new Error('A multi-column CSV needs a header to identify the ECG column, for example time,signal.');
     if(!values){
       values=rows.slice(start).map((r,i)=>{
-        if(r.length!==rows[0].length||!number(r[col]??''))throw new Error(`Dữ liệu không hợp lệ tại dòng ${i+start+1}.`);
+        if(r.length!==rows[0].length||!number(r[col]??''))throw new Error(`Invalid data on line ${i+start+1}.`);
         return Number(r[col]);
       });
     }
@@ -48,10 +48,10 @@ function zscore(a){const m=mean(a),sd=Math.sqrt(mean(a.map(v=>(v-m)**2)));return
 export function statistics(a){const m=mean(a);return {mean:m,std:Math.sqrt(mean(a.map(v=>(v-m)**2))),min:Math.min(...a),max:Math.max(...a)}}
 export function preprocess(signal,options={detrend:true,smooth:true,normalize:true}){
   validateSignal(signal);let a=[...signal];const steps=[];
-  if(options.detrend){const mid=(a.length-1)/2,m=mean(a),den=a.reduce((s,_,i)=>s+(i-mid)**2,0),slope=a.reduce((s,v,i)=>s+(i-mid)*(v-m),0)/den;a=a.map((v,i)=>v-m-slope*(i-mid));steps.push('Loại xu hướng tuyến tính');}
-  if(options.smooth){a=a.map((_,i)=>mean([-2,-1,0,1,2].map(d=>a[Math.max(0,Math.min(a.length-1,i+d))])));steps.push('Làm mượt trung bình 5 mẫu');}
-  a=resample(a);steps.push('Nội suy về 256 mẫu');
-  if(options.normalize){a=zscore(a);steps.push('Chuẩn hóa Z-score');}
+  if(options.detrend){const mid=(a.length-1)/2,m=mean(a),den=a.reduce((s,_,i)=>s+(i-mid)**2,0),slope=a.reduce((s,v,i)=>s+(i-mid)*(v-m),0)/den;a=a.map((v,i)=>v-m-slope*(i-mid));steps.push('Linear detrending');}
+  if(options.smooth){a=a.map((_,i)=>mean([-2,-1,0,1,2].map(d=>a[Math.max(0,Math.min(a.length-1,i+d))])));steps.push('5-sample moving average');}
+  a=resample(a);steps.push('Resampling to 256 samples');
+  if(options.normalize){a=zscore(a);steps.push('Z-score normalization');}
   validateSignal(a);
   return {signal:a,original_length:signal.length,processed_length:a.length,steps,statistics:{before:statistics(signal),after:statistics(a)}};
 }

@@ -108,32 +108,31 @@ This creates `processed_data/X.npy`, `processed_data/y.npy`, `processed_data/rec
 
 ## ECG Studio web
 
-The web interface is in [`web/`](web/README.md). It can run independently in browser demo mode; an optional FastAPI backend connects the interface to trained models later.
+The web interface is in [`web/`](web/README.md). React connects to FastAPI and runs the group's trained CNN, BiLSTM and Transformer checkpoints directly. CNN is selected initially because it has the highest macro F1 in the saved comparison. Explicit browser/prototype demos remain available for illustration.
 
-From the repository root:
+On Windows, run from the repository root:
 
-```bash
-npm --prefix web ci
-npm --prefix web run dev
+```powershell
+.\web\scripts\setup.ps1
+.\web\scripts\run-local.ps1
 ```
 
-Open `http://127.0.0.1:5173`. To run the optional backend:
+Open `http://127.0.0.1:5173`; the API is at `http://127.0.0.1:8000/docs`. Setup uses a project virtual environment and CPU PyTorch. See the web README for manual commands and macOS/Linux setup.
 
-```bash
-python -m pip install -r web/backend/requirements.txt
-python -m uvicorn app:app --app-dir web/backend --host 127.0.0.1 --port 8000
-```
-
-The group contract is **180 raw samples at 360 Hz** with class order **N, S, V, F, Q**. The `team` API pipeline uses the existing `preprocessing.py` bandpass + Z-score pipeline without resampling; confirm that a checkpoint was trained with this preprocessing before configuring it. Browser/prototype demos use a separate illustrative 256-sample pipeline and do not report MIT-BIH accuracy.
+The group contract is **180 raw samples at 360 Hz** with class order **N, S, V, F, Q**. The `team` API pipeline calls the existing `preprocessing.py` bandpass + Z-score pipeline without resampling. Browser/prototype demos use a separate illustrative 256-sample pipeline and do not report MIT-BIH accuracy.
 
 `data_loader.py` currently reads the raw split. Models using the `team` API adapter must train with `processed_data/preprocessed/` or call the same shared `preprocess_data` function. Do not filter preprocessed signals again when sending them to the API.
 
 - [Run the web and API](web/README.md)
 - [Integrate and check trained checkpoints](web/docs/MODEL_INTEGRATION.md)
+- [Demo and presentation guide](web/docs/DEMO_GUIDE.md)
+- [Integration verification report](web/docs/INTEGRATION_REPORT.md)
 - Export one raw heartbeat: `python web/scripts/export_heartbeat.py --split test --index 0 --output exports/test-beat-0.csv`
-- The `ECG web checks` workflow tests the frontend, backend/shared pipeline and exporter, and builds the web on working branches and pull requests. It does not publish a website or merge branches.
+- The `ECG web checks` workflow tests the frontend, backend/shared pipeline, exporter and actual checkpoint/API agreement, then builds the web. It does not publish a website or merge branches.
 
-The repository includes the shared RAW splits through Git LFS and trained CNN/RNN weight artifacts. These training checkpoints must be loaded with their original architecture and exported to TorchScript before the web adapter can use them; the web runs explicit prototype demos until configured. See the integration guide for the checkpoint formats and pipeline requirements.
+The repository includes shared RAW splits through Git LFS, all three original architectures/checkpoints and evaluation artifacts. The backend loads native checkpoints by default; TorchScript is an optional custom adapter. Real test examples keep their reference labels separate from predictions, and the experiment view displays saved metrics, confusion matrices and robustness results.
+
+Checkpoint/API outputs were compared on 35 real heartbeats per model. Replaying all 18,098 test heartbeats per model reproduced the saved confusion matrices exactly; see the integration report and `web/scripts/verify_trained_integration.py`. This verifies integration and reproduces existing model quality; it does not imply every prediction is correct or calibrated.
 
 The generated static interface can be hosted separately when the team chooses to publish it. A trained model needs a separate HTTPS API; the web can be pointed to it through **Kết nối model**. The checks workflow does not deploy the website.
 
