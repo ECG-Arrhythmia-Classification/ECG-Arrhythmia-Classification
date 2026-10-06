@@ -86,6 +86,20 @@ X_train, y_train, X_val, y_val, X_test, y_test = load_dataset()
 
 Use these shared splits for all models so their results can be compared fairly. Do not create a different train/validation/test split for each model.
 
+## Train the Transformer model
+
+Install the dependencies from `requirements.txt`, then create normalized data and class weights before training:
+
+```bash
+python preprocessing.py
+python augmentation.py
+python train_transformer.py
+```
+
+The trainer reads normalized splits from `processed_data/preprocessed/` and class weights from `processed_data/augmented/class_weights.npy`. It uses the class weights with the original train split to account for rare classes. Edit the settings at the top of `train_transformer.py` to change the model or training parameters.
+
+The best checkpoint is selected by validation macro-F1. Results are written to `results/transformer/`: `best_model.pt`, `metrics.json`, `training_history.csv`, `training_curve.png`, and `attention_example.png`. The curve and CSV update after each epoch.
+
 ## Rebuild the processed dataset
 
 Most team members do not need to run these steps. The ready-to-use split files are already available through Git LFS.

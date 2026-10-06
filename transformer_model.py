@@ -59,10 +59,6 @@ class ECGTransformer(nn.Module):
         self.classifier = nn.Linear(dimension, classes)
         nn.init.normal_(self.class_token, std=0.02)
 
- feature/ecg-transformer
- feature/ecg-transformer
- feature/ecg-transformer
-
   """Small Transformer classifier for 180-sample ECG heartbeats."""
 
 import math
@@ -124,20 +120,11 @@ class ECGTransformer(nn.Module):
         self.classifier = nn.Linear(dimension, classes)
         nn.init.normal_(self.class_token, std=0.02)
 
- main
     @staticmethod
     def _make_position_encoding(length, dimension):
         position = torch.arange(length, dtype=torch.float32).unsqueeze(1)
         scale = torch.exp(torch.arange(0, dimension, 2) * (-math.log(10000.0) / dimension))
- feature/ecg-transformer
-feature/ecg-transformer
-        encoding = torch.zeros(length, dimension)x
-  
         encoding = torch.zeros(length, dimension)
- main
-
-        encoding = torch.zeros(length, dimension)
- main
         encoding[:, 0::2] = torch.sin(position * scale)
         encoding[:, 1::2] = torch.cos(position * scale[:encoding[:, 1::2].shape[1]])
         return encoding.unsqueeze(0)
@@ -145,19 +132,6 @@ feature/ecg-transformer
     def forward(self, x, show_attention=False):
         if x.ndim == 2:
             x = x.unsqueeze(1)
- feature/ecg-transformer
-
-   @staticmethod
-def _make_position_encoding(length, dimension):
-    position = torch.arange(length, dtype=torch.float32).unsqueeze(1)
-    scale = torch.exp(torch.arange(0, dimension, 2) * (-math.log(10000.0) / dimension))
-    encoding = torch.zeros(length, dimension)
-    encoding[:, 0::2] = torch.sin(position * scale)
-    encoding[:, 1::2] = torch.cos(position * scale[:encoding[:, 1::2].shape[1]])
-    return encoding.unsqueeze(0)
- main
-
- main
         if x.ndim != 3 or x.shape[1:] != (1, self.input_length):
             raise ValueError(f"Expected input shape (batch, {self.input_length})")
 
@@ -175,8 +149,3 @@ def _make_position_encoding(length, dimension):
 
         logits = self.classifier(x[:, 0])
         return (logits, attention) if show_attention else logits
-
-    @staticmethod
-    def _make_position_encoding(length, dimension):*
-
- main
