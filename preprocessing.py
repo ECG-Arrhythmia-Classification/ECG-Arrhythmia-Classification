@@ -26,7 +26,6 @@ MIN_STD = 1e-8
 # lóad data
 
 def load_data(split_name):
-    """ tải tín hiệu ECG """
 
     X_path = INPUT_DIR / f"X_{split_name}.npy"
     y_path = INPUT_DIR / f"y_{split_name}.npy"
@@ -62,19 +61,16 @@ def check_data(X, y):
 
     if len(X) != len(y):
         raise ValueError(
-            "Number of ECG signals and labels does not match."
         )
 
     if not np.isfinite(X).all():
         raise ValueError(
-            "ECG data contains NaN or Inf."
         )
 
 
 # filter signal
 # Remove low-frequency and high-frequency noise
 def filter_signal(X):
-    """Remove low-frequency and high-frequency noise."""
 
     filter_sos = butter(
         FILTER_ORDER,
